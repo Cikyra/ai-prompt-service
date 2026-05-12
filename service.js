@@ -1,4 +1,5 @@
 import express from "express";
+import OpenAI from "openai";
 
 const app = express();
 app.use(express.json());
@@ -7,14 +8,14 @@ const apiKey = process.env.OPENAI_API_KEY;
 app.post("/generate", async (req, res) => {
     const { prompt } = req.body;
     //TODO: Validate the prompt
-    import OpenAI from "openai";
+    
 
     const openai = new OpenAI({
     apiKey: apiKey,
     });
 
     const completion = await openai.chat.completions.create({
-        model: "got-4.1",
+        model: "gpt-4.1",
         messages:[
             {
                 role: "user",
