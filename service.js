@@ -1,29 +1,56 @@
 import express from "express";
+import OpenAI from "openai";
+
 
 const app = express();
 app.use(express.json());
 const apiKey = process.env.OPENAI_API_KEY;
 
+const openai = new OpenAI({
+    apiKey: apiKey,
+});
+
 app.post("/generate", async (req, res) => {
     const { prompt } = req.body;
     //TODO: Validate the prompt
-    import OpenAI from "openai";
 
-    const openai = new OpenAI({
-    apiKey: apiKey,
-    });
-
-    const completion = await openai.chat.completions.create({
-        model: "got-4.1",
+    const textOrImage = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
         messages:[
+            {
+                role: "system", 
+                content: "Classify the user prompt as either text or image. Respond with 'TEXT' or 'IMAGE' only.",
+            },
             {
                 role: "user",
                 content: prompt,
             },
         ],
-    });
+    }); 
 
-    res.json({ response: completion.choices[0].message.content });
+    const classification = textOrImage.choices[0].message.content.trim().toUpperCase();
+
+    if(classification === "IMAGE") {
+        const imageResponse = await openai.images.generate({
+            model: "dall-e-3",
+            prompt: prompt,
+            size: "1024x1024",
+        });
+        return res.json({response: imageResponse.data[0].url });
+    }else{
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4.1",
+            messages:[
+                {
+                    role: "user",
+                    content: prompt,
+                },
+            ],
+        });
+
+
+        res.json({ response: completion.choices[0].message.content });
+        }
 });
 
 app.listen(3000, () => {
