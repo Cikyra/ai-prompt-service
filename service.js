@@ -32,11 +32,14 @@ app.post("/generate", async (req, res) => {
 
     if(classification === "IMAGE") {
         const imageResponse = await openai.images.generate({
-            model: "dall-e-3",
+            model: "gpt-image-1.5",
             prompt: prompt,
             size: "1024x1024",
         });
-        return res.json({response: imageResponse.data[0].url });
+        
+        const dataURL = `data:image/png;base64,${imageResponse.data[0].b64_json}`;
+
+        return res.json({response: dataURL});
     }else{
         const completion = await openai.chat.completions.create({
             model: "gpt-4.1",
@@ -47,7 +50,6 @@ app.post("/generate", async (req, res) => {
                 },
             ],
         });
-
 
         res.json({ response: completion.choices[0].message.content });
         }
