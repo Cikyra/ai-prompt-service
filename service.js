@@ -10,6 +10,14 @@ const openai = new OpenAI({
     apiKey: apiKey,
 });
 
+const withTimeout = (promise, ms) =>
+    Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
+
 app.post("/generate", async (req, res) => {
     const { prompt } = req.body;
     //TODO: Validate the prompt
@@ -31,28 +39,38 @@ app.post("/generate", async (req, res) => {
     const classification = textOrImage.choices[0].message.content.trim().toUpperCase();
 
     if(classification === "IMAGE") {
-        const imageResponse = await openai.images.generate({
-            model: "gpt-image-1.5",
-            prompt: prompt,
-            size: "1024x1024",
-        });
-        
-        const dataURL = `data:image/png;base64,${imageResponse.data[0].b64_json}`;
-
-        return res.json({response: dataURL});
-    }else{
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4.1",
-            messages:[
-                {
-                    role: "user",
-                    content: prompt,
-                },
-            ],
-        });
-
-        res.json({ response: completion.choices[0].message.content });
+        try {
+            const imageResponse = await withTimeout(
+                openai.images.generate({
+                    model: "gpt-image-1.5",
+                    prompt: prompt,
+                    size: "1024x1024",
+                }),
+                15000
+            );
+            return res.json({ response: imageResponse.data[0].b64_json });
+        } catch (err) {
+            return res.status(500).json({ error: "Image generation failed: " + err.message });
         }
+    } else {
+        try {
+            const completion = await withTimeout(
+                openai.chat.completions.create({
+                    model: "gpt-4.1",
+                    messages:[
+                        {
+                            role: "user",
+                            content: prompt,
+                        },
+                    ],
+                }),
+                5000
+            );
+            return res.json({ response: completion.choices[0].message.content });
+        } catch (err) {
+            return res.status(500).json({ error: "Text generation failed: " + err.message });
+        }
+    }
 });
 
 app.listen(3000, () => {
