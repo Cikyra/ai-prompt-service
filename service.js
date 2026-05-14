@@ -21,22 +21,33 @@ const withTimeout = (promise, ms) =>
 app.post("/generate", async (req, res) => {
     const { prompt } = req.body;
     //TODO: Validate the prompt
+    console.log("[generate] Request received, prompt:", prompt?.slice(0, 80));
 
-    const textOrImage = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages:[
-            {
-                role: "system", 
-                content: "Classify the user prompt as either text or image. Respond with 'TEXT' or 'IMAGE' only.",
-            },
-            {
-                role: "user",
-                content: prompt,
-            },
-        ],
-    }); 
+    let classification;
+    try {
+        const textOrImage = await withTimeout(
+            openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages:[
+                    {
+                        role: "system",
+                        content: "Classify the user prompt as either text or image. Respond with 'TEXT' or 'IMAGE' only.",
+                    },
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ],
+            }),
+            5000
+        );
+        classification = textOrImage.choices[0].message.content.trim().toUpperCase();
+    } catch (err) {
+        console.error("[generate] Classification failed:", err.message);
+        return res.status(500).json({ error: "Classification failed: " + err.message });
+    }
 
-    const classification = textOrImage.choices[0].message.content.trim().toUpperCase();
+    console.log("[generate] Classified as:", classification);
 
     if(classification === "IMAGE") {
         try {
@@ -46,10 +57,12 @@ app.post("/generate", async (req, res) => {
                     prompt: prompt,
                     size: "1024x1024",
                 }),
-                15000
+                35000
             );
+            console.log("[generate] Image generation succeeded");
             return res.json({ response: imageResponse.data[0].b64_json });
         } catch (err) {
+            console.error("[generate] Image generation failed:", err.message);
             return res.status(500).json({ error: "Image generation failed: " + err.message });
         }
     } else {
@@ -68,6 +81,7 @@ app.post("/generate", async (req, res) => {
             );
             return res.json({ response: completion.choices[0].message.content });
         } catch (err) {
+            console.error("[generate] Text generation failed:", err.message);
             return res.status(500).json({ error: "Text generation failed: " + err.message });
         }
     }
