@@ -121,43 +121,22 @@ curl -s -X POST http://localhost:3000/generate \
 ```mermaid
 sequenceDiagram
     actor Client
-    participant Service as AI Prompt Service<br/>(localhost:3000)
-    participant Classifier as OpenAI GPT-4o-mini<br/>(classifier)
-    participant TextModel as OpenAI GPT-4.1<br/>(text generation)
-    participant ImageModel as OpenAI gpt-image-1.5<br/>(image generation)
+    participant Service as AI Prompt Service
+    participant Classifier as GPT-4o-mini
+    participant TextModel as GPT-4.1
+    participant ImageModel as gpt-image-1.5
 
     Client->>Service: POST /generate { "prompt": "..." }
+    Service->>Classifier: Is this TEXT or IMAGE? (5s timeout)
+    Classifier-->>Service: "TEXT" or "IMAGE"
 
-    Service->>Classifier: Classify prompt as TEXT or IMAGE
-    Note over Service,Classifier: Timeout: 5s
-
-    alt Classification fails or times out
-        Classifier-->>Service: Error
-        Service-->>Client: 500 { "error": "Classification failed: ..." }
-    else Classification succeeds
-        Classifier-->>Service: "TEXT" or "IMAGE"
-    end
-
-    alt Prompt classified as TEXT
-        Service->>TextModel: Generate text completion
-        Note over Service,TextModel: Timeout: 5s
-        alt Success
-            TextModel-->>Service: Text response string
-            Service-->>Client: 200 { "response": "text string" }
-        else Failure or timeout
-            TextModel-->>Service: Error
-            Service-->>Client: 500 { "error": "Text generation failed: ..." }
-        end
-
-    else Prompt classified as IMAGE
-        Service->>ImageModel: Generate image from prompt
-        Note over Service,ImageModel: Timeout: 35s
-        alt Success
-            ImageModel-->>Service: Base64-encoded PNG
-            Service-->>Client: 200 { "response": "base64 PNG string" }
-        else Failure or timeout
-            ImageModel-->>Service: Error
-            Service-->>Client: 500 { "error": "Image generation failed: ..." }
-        end
+    alt TEXT
+        Service->>TextModel: Generate text (5s timeout)
+        TextModel-->>Service: Text string
+        Service-->>Client: 200 { "response": "text string" }
+    else IMAGE
+        Service->>ImageModel: Generate image (35s timeout)
+        ImageModel-->>Service: Base64 PNG
+        Service-->>Client: 200 { "response": "base64 PNG string" }
     end
 ```
